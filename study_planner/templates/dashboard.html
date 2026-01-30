@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Study Planner - Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+    <header>
+        <nav>
+            <div class="logo">Study Planner</div>
+            <div class="nav-links">
+                <span>Welcome, Student!</span>
+                <a href="{{ url_for('home') }}" class="btn">Logout</a>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container">
+        <h1>My Dashboard</h1>
+        <div class="dashboard-content">
+            <div class="card">
+                <h3>Current Study Plan</h3>
+                <p>You have no active study plans yet.</p>
+                <button class="btn btn-small">Create New Plan</button>
+            </div>
+
+            <div class="card">
+                <h3>Progress</h3>
+                <p>Track your learning journey here.</p>
+            </div>
+        </div>
+
+        <div class="ml-notice">
+            <p><em>Coming Soon: AI-driven study recommendations based on your learning pace!</em></p>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 Study Planner. All rights reserved.</p>
+    </footer>
+</body>
+
+</html>
