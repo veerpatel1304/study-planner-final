@@ -14,9 +14,21 @@
             div.className = 'form-group subject-group';
             div.innerHTML = `
                 <label>Subject ${index + 1}</label>
-                <input type="text" name="subjects[]" placeholder="e.g. Data Structures" required>
-                <input type="text" name="topics[]" placeholder="Topics (comma separated)" style="margin-top: 0.5rem;">
-                <button type="button" class="btn btn-small btn-danger" onclick="this.parentElement.remove()">Remove</button>
+                <div class="field-row">
+                    <input type="text" name="subjects[]" placeholder="e.g. Data Structures" style="flex: 2;">
+                    <select name="difficulties[]" style="flex: 1; margin-left: 0.5rem; padding: 0.5rem;">
+                        <option value="1">Easy</option>
+                        <option value="2" selected>Medium</option>
+                        <option value="3">Hard</option>
+                    </select>
+                </div>
+                <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem; align-items: center;">
+                    <input type="file" name="syllabus_pdfs[]" accept=".pdf" style="font-size: 0.8rem; flex: 2;">
+                    <input type="number" name="unit_starts[]" placeholder="Unit Start" style="flex: 1; padding: 0.3rem;">
+                    <input type="number" name="unit_ends[]" placeholder="Unit End" style="flex: 1; padding: 0.3rem;">
+                </div>
+                <input type="text" name="topics[]" placeholder="Manual Topics (comma separated)" style="margin-top: 0.5rem;">
+                <button type="button" class="btn btn-small btn-danger" onclick="this.parentElement.remove()" style="margin-top: 0.5rem;">Remove</button>
             `;
             container.appendChild(div);
         }
@@ -28,6 +40,12 @@
             border-radius: 4px;
             border: 1px solid #ddd;
             margin-bottom: 1rem;
+        }
+
+        .field-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
     </style>
 </head>
@@ -58,7 +76,7 @@
             {% endif %}
             {% endwith %}
 
-            <form action="{{ url_for('create_plan') }}" method="POST">
+            <form action="{{ url_for('create_plan') }}" method="POST" enctype="multipart/form-data">
                 <div class="form-group">
                     <label for="title">Plan Title</label>
                     <input type="text" id="title" name="title" placeholder="e.g. Semester 4 - Fall 2025" required>
@@ -82,12 +100,27 @@
                 </div>
 
                 <h3>Subjects</h3>
-                <p>Add the subjects you are taking this semester.</p>
+                <p>Add your subjects. You can upload a syllabus PDF for any subject to auto-extract topics.</p>
                 <div id="subjects-container">
                     <div class="form-group subject-group">
                         <label>Subject 1</label>
-                        <input type="text" name="subjects[]" placeholder="e.g. Calculus II" required>
-                        <input type="text" name="topics[]" placeholder="Topics (comma separated)"
+                        <div class="field-row">
+                            <input type="text" name="subjects[]" placeholder="e.g. Calculus II" required
+                                style="flex: 2;">
+                            <select name="difficulties[]" style="flex: 1; margin-left: 0.5rem; padding: 0.5rem;">
+                                <option value="1">Easy</option>
+                                <option value="2" selected>Medium</option>
+                                <option value="3">Hard</option>
+                            </select>
+                        </div>
+                        <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem; align-items: center;">
+                            <input type="file" name="syllabus_pdfs[]" accept=".pdf" style="font-size: 0.8rem; flex: 2;">
+                            <input type="number" name="unit_starts[]" placeholder="Unit Start"
+                                style="flex: 1; padding: 0.3rem;">
+                            <input type="number" name="unit_ends[]" placeholder="Unit End"
+                                style="flex: 1; padding: 0.3rem;">
+                        </div>
+                        <input type="text" name="topics[]" placeholder="Manual Topics (comma separated)"
                             style="margin-top: 0.5rem;">
                     </div>
                 </div>

@@ -136,7 +136,17 @@ def dashboard():
     except Exception as e:
         print(f"Error fetching plans: {e}")
         
-    return render_template('dashboard.html', user=session['user'], plans=plans)
+    db_healthy = True
+    try:
+        supabase = get_db_connection(session.get('access_token'))
+        # Try to ping the tables
+        supabase.table('profiles').select("id").limit(1).execute()
+        supabase.table('tasks').select("id").limit(1).execute()
+    except Exception as e:
+        if "PGRST204" in str(e) or "404" in str(e) or "tasks" in str(e).lower():
+            db_healthy = False
+
+    return render_template('dashboard.html', user=session['user'], plans=plans, db_healthy=db_healthy)
 
 @app.route('/profile', methods=['GET', 'POST'])
 def profile():
@@ -180,8 +190,6 @@ def profile():
         
         return render_template('profile.html', profile=profile)
         
-        return render_template('profile.html', profile=profile)
-        
     except Exception as e:
         print(f"DEBUG ERROR in /profile: {e}") # Print to console
         flash(f"Error accessing profile: {str(e)}", "error")
@@ -200,10 +208,14 @@ def create_plan():
         
         subjects = request.form.getlist('subjects[]')
         topics = request.form.getlist('topics[]')
+        difficulties = request.form.getlist('difficulties[]')
         
         user_id = session.get('user_id')
         
         try:
+            from ai_planner import get_agent
+            planner = get_agent()
+            
             supabase = get_db_connection(session.get('access_token'))
             
             # 1. Create the Plan
@@ -221,50 +233,103 @@ def create_plan():
                 
             plan_id = plan_res.data[0]['id']
             
-            # 2. Add Subjects
+            # 2. Add Subjects (Manual + PDF)
             subjects_data = []
-            subjects_info_for_ai = [] # Keep track for AI
+            subjects_info_for_ai = [] 
+            
+            # Form data lists
+            subjects = request.form.getlist('subjects[]')
+            manual_topics_list = request.form.getlist('topics[]')
+            difficulties = request.form.getlist('difficulties[]')
+            unit_starts = request.form.getlist('unit_starts[]')
+            unit_ends = request.form.getlist('unit_ends[]')
+            
+            # Files list (Note: request.files.getlist returns files in order of indices if they were all submitted)
+            # However, HTML file inputs can be tricky if some are empty. 
+            # We'll use the file list and map them to their subjects.
+            syllabus_files = request.files.getlist('syllabus_pdfs[]')
             
             for i in range(len(subjects)):
-                if subjects[i].strip(): # Only add if name is not empty
-                    sub_name = subjects[i].strip()
-                    sub_topics = topics[i].strip() if i < len(topics) else ""
+                if not subjects[i].strip(): continue
+                
+                sub_name = subjects[i].strip()
+                sub_diff = difficulties[i] if i < len(difficulties) else "2"
+                manual_top = manual_topics_list[i].strip() if i < len(manual_topics_list) else ""
+                
+                # Check if this subject has an uploaded syllabus
+                # Flask getlist for files includes empty FileStorage objects for empty inputs
+                file = syllabus_files[i] if i < len(syllabus_files) else None
+                
+                extracted_topics = []
+                if file and file.filename != '':
+                    u_start = unit_starts[i] if i < len(unit_starts) else None
+                    u_end = unit_ends[i] if i < len(unit_ends) else None
+                    extracted_topics = planner.extract_from_pdf(file, u_start, u_end)
                     
-                    subjects_data.append({
-                        "plan_id": plan_id,
-                        "name": sub_name,
-                        "topics": sub_topics
+                # Store the subject record
+                main_topics_summary = manual_top
+                if extracted_topics:
+                    pdf_summary = f"Extracted {len(extracted_topics)} topics from PDF"
+                    main_topics_summary = f"{manual_top}, {pdf_summary}" if manual_top else pdf_summary
+                
+                subjects_data.append({
+                    "plan_id": plan_id,
+                    "name": sub_name,
+                    "topics": main_topics_summary
+                })
+                
+                # Prepare info for AI generator
+                # 1. Add PDF topics if any
+                for t in extracted_topics:
+                    subjects_info_for_ai.append({
+                        'name': sub_name,
+                        'topics': t['name'],
+                        'difficulty': t['difficulty']
                     })
-                    subjects_info_for_ai.append({'name': sub_name, 'topics': sub_topics})
-            
+                
+                # 2. Add Manual topics if any
+                if manual_top:
+                    for t in manual_top.split(','):
+                        t_name = t.strip()
+                        if t_name:
+                            subjects_info_for_ai.append({
+                                'name': sub_name,
+                                'topics': t_name,
+                                'difficulty': sub_diff
+                            })
+                            
             if subjects_data:
-                # Insert subjects and get their IDs back to link tasks
-                # Supabase insert with select returns data
                 sub_res = supabase.table('subjects').insert(subjects_data).execute()
                 created_subjects = sub_res.data
                 
-                # 3. AI PLAN GENERATION
-                # We need to map subject names back to their new IDs to save tasks correctly
-                subject_name_to_id = {s['name']: s['id'] for s in created_subjects}
+                if not created_subjects:
+                    raise Exception("Failed to save subjects to database. Check RLS policies.")
                 
-                from ai_planner import ManualPlanner
-                planner = ManualPlanner()
+                subject_name_to_id = {s['name']: s['id'] for s in created_subjects}
                 generated_schedule = planner.generate_plan(subjects_info_for_ai, start_date, end_date)
+                
+                print(f"DEBUG: Generated {len(generated_schedule)} tasks")
                 
                 tasks_data = []
                 for item in generated_schedule:
-                    # Find which subject ID this task belongs to
                     s_id = subject_name_to_id.get(item['subject'])
                     if s_id:
                         tasks_data.append({
                             "subject_id": s_id,
-                            "description": item['task'],
+                            "description": item['description'],
+                            "reference": item.get('reference'),
                             "due_date": item['date'],
                             "is_completed": False
                         })
                 
                 if tasks_data:
-                     supabase.table('tasks').insert(tasks_data).execute()
+                    try:
+                        supabase.table('tasks').insert(tasks_data).execute()
+                    except Exception as e:
+                        if "PGRST205" in str(e) or "tasks" in str(e).lower():
+                            flash("Plan created, but 'tasks' table is missing in Supabase. Please run schema.sql.", "warning")
+                        else:
+                            raise e
                 
             flash("Study Plan created! AI has generated your schedule.", "success")
             return redirect(url_for('dashboard'))
@@ -275,6 +340,71 @@ def create_plan():
             return redirect(url_for('create_plan'))
             
     return render_template('create_plan.html')
+
+@app.route('/view_plan/<plan_id>')
+def view_plan(plan_id):
+    if 'user' not in session:
+        return redirect(url_for('login'))
+        
+    try:
+        supabase = get_db_connection(session.get('access_token'))
+        
+        # 1. Fetch Plan
+        plan_res = supabase.table('study_plans').select("*").eq('id', plan_id).single().execute()
+        plan = plan_res.data
+        
+        # 2. Fetch Subjects first to get their IDs
+        subjects_res = supabase.table('subjects').select("id, name").eq('plan_id', plan_id).execute()
+        subject_ids = [s['id'] for s in subjects_res.data]
+        subject_map = {s['id']: s['name'] for s in subjects_res.data}
+        
+        if not subject_ids:
+            return render_template('view_plan.html', plan=plan, tasks_by_date={}, sorted_dates=[])
+
+        # 3. Fetch Tasks for those subjects
+        tasks_by_date = {}
+        try:
+            tasks_res = supabase.table('tasks').select("*").in_('subject_id', subject_ids).order('due_date', desc=False).execute()
+            
+            # Group tasks by date
+            for task in tasks_res.data:
+                # Manually add subject name for the template
+                task['subjects'] = {'name': subject_map.get(task['subject_id'], "Unknown Subject")}
+                
+                date = task['due_date']
+                if date not in tasks_by_date:
+                    tasks_by_date[date] = []
+                tasks_by_date[date].append(task)
+        except Exception as e:
+            if "PGRST205" in str(e) or "tasks" in str(e).lower():
+                print("Warning: tasks table missing in Supabase")
+                flash("The 'tasks' table is missing in your Supabase database. Please run schema.sql to see your targets.", "warning")
+            else:
+                raise e
+            
+        # Sort dates
+        sorted_dates = sorted(tasks_by_date.keys())
+        
+        return render_template('view_plan.html', plan=plan, tasks_by_date=tasks_by_date, sorted_dates=sorted_dates)
+        
+    except Exception as e:
+        print(f"Error viewing plan: {e}")
+        flash(f"Error loading plan details: {str(e)}", "error")
+        return redirect(url_for('dashboard'))
+
+@app.route('/toggle_task/<task_id>', methods=['POST'])
+def toggle_task(task_id):
+    if 'user' not in session:
+        return {"error": "Unauthorized"}, 401
+        
+    completed = request.json.get('completed', False)
+    
+    try:
+        supabase = get_db_connection(session.get('access_token'))
+        supabase.table('tasks').update({"is_completed": completed}).eq('id', task_id).execute()
+        return {"success": True}
+    except Exception as e:
+        return {"error": str(e)}, 500
 
 if __name__ == '__main__':
     app.run(debug=True)

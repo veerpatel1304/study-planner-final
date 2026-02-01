@@ -22,6 +22,27 @@
 
     <main class="container">
         <h1>My Dashboard</h1>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="flash-messages">
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        {% if not db_healthy %}
+        <div class="alert alert-warning" style="margin-bottom: 2rem; border-left: 5px solid #f39c12;">
+            <h4 style="margin-top: 0;">⚠️ Database Setup Required</h4>
+            <p>The AI Agent cannot save your study plans because the <code>tasks</code> table is missing in your
+                Supabase project.</p>
+            <p style="margin-top: 0.5rem;">To fix this, please run the SQL code from <code>schema.sql</code> in your
+                <strong>Supabase SQL Editor</strong>.</p>
+        </div>
+        {% endif %}
+
         <div class="dashboard-content">
             <div class="card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
@@ -38,7 +59,8 @@
                         <small>From {{ plan.start_date }} to {{ plan.end_date }}</small>
                         <div style="margin-top: 0.5rem;">
                             <!-- Placeholder for View/Edit links -->
-                            <a href="#" style="color: var(--primary-color); font-size: 0.9rem;">View Details</a>
+                            <a href="{{ url_for('view_plan', plan_id=plan.id) }}"
+                                style="color: var(--primary-color); font-size: 0.9rem;">View Details</a>
                         </div>
                     </li>
                     {% endfor %}

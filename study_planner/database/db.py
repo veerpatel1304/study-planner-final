@@ -21,8 +21,6 @@ def get_db_connection(access_token=None) -> Client:
         # Set the access token in the headers for all subsequent requests
         # This is necessary for Row Level Security (RLS) to work
         supabase.postgrest.auth(access_token)
-        # Also set it for other services if needed
-        supabase.storage.auth(access_token)
         
     return supabase
 

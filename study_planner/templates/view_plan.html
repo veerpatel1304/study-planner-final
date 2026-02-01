@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ plan.title }} - Study Plan</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .plan-header {
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--primary-color);
+        }
+
+        .day-section {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            margin-bottom: 2rem;
+            overflow: hidden;
+        }
+
+        .day-title {
+            background: #f8f9fa;
+            padding: 1rem;
+            font-weight: bold;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .task-item {
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background 0.2s;
+        }
+
+        .task-item:last-child {
+            border-bottom: none;
+        }
+
+        .task-item:hover {
+            background: #fafafa;
+        }
+
+        .task-checkbox {
+            width: 20px;
+            height: 20px;
+            margin-right: 1rem;
+            cursor: pointer;
+        }
+
+        .task-content {
+            flex: 1;
+        }
+
+        .task-subject {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--primary-color);
+            font-weight: bold;
+            margin-bottom: 0.2rem;
+        }
+
+        .task-desc {
+            font-size: 1rem;
+        }
+
+        .completed .task-desc {
+            text-decoration: line-through;
+            color: #888;
+        }
+
+        .badge {
+            font-size: 0.7rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 10px;
+            background: #e9ecef;
+            color: #495057;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <nav>
+            <div class="logo">Study Planner</div>
+            <div class="nav-links">
+                <a href="{{ url_for('dashboard') }}" class="btn">Dashboard</a>
+                <a href="{{ url_for('profile') }}" class="btn">My Profile</a>
+                <a href="{{ url_for('logout') }}" class="btn">Logout</a>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="flash-messages">
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        <div class="plan-header">
+            <h1>{{ plan.title }}</h1>
+            <p class="lead">{{ plan.goal }}</p>
+            <div style="margin-top: 0.5rem;">
+                <span class="badge">Start: {{ plan.start_date }}</span>
+                <span class="badge">End: {{ plan.end_date }}</span>
+            </div>
+        </div>
+
+        {% if sorted_dates %}
+        {% for date in sorted_dates %}
+        <div class="day-section">
+            <div class="day-title">
+                <span>Target for {{ date }}</span>
+                <span class="badge">{{ tasks_by_date[date]|length }} Tasks</span>
+            </div>
+            <div class="task-list">
+                {% for task in tasks_by_date[date] %}
+                <div class="task-item {% if task.is_completed %}completed{% endif %}" id="task-{{ task.id }}">
+                    <input type="checkbox" class="task-checkbox" {% if task.is_completed %}checked{% endif %}
+                        onchange="toggleTask('{{ task.id }}', this.checked)">
+                    <div class="task-content">
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.2rem;">
+                            <div class="task-subject">{{ task.subjects.name }}</div>
+                            <span class="badge" style="
+                                background: {% if 'Easy' in task.description %}#e8f5e9; color: #2e7d32;
+                                            {% elif 'Medium' in task.description %}#fff3e0; color: #ef6c00;
+                                            {% else %}#ffebee; color: #c62828;{% endif %};
+                                font-size: 0.65rem; border: none; font-weight: bold;
+                            ">
+                                {% if 'Easy' in task.description %}EASY
+                                {% elif 'Medium' in task.description %}MEDIUM
+                                {% else %}HARD{% endif %}
+                            </span>
+                        </div>
+                        <div class="task-desc">{{ task.description.replace('[Easy]', '').replace('[Medium]',
+                            '').replace('[Hard]', '').strip() }}</div>
+                        {% if task.reference %}
+                        <div class="task-ref" style="font-size: 0.8rem; margin-top: 0.3rem;">
+                            <span style="color: #666;">Source:</span>
+                            <a href="#"
+                                onclick="alert('In a real app, this would open: {{ task.reference }}'); return false;"
+                                style="color: var(--primary-color); text-decoration: underline;">{{ task.reference
+                                }}</a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="card" style="text-align: center; padding: 4rem 2rem; border: 2px dashed #ddd;">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">📋</div>
+            <h3>No tasks found for this plan</h3>
+            <p style="color: #666; max-width: 500px; margin: 0 auto 2rem;">
+                This usually happens because the <code>tasks</code> table hasn't been created in your database yet.
+                Running the SQL script will allow the AI Agent to populate your schedule.
+            </p>
+            <div style="display: flex; gap: 1rem; justify-content: center;">
+                <a href="{{ url_for('dashboard') }}" class="btn">Back to Dashboard</a>
+                <a href="{{ url_for('create_plan') }}" class="btn btn-primary">Try Re-generating Plan</a>
+            </div>
+        </div>
+        {% endif %}
+    </main>
+
+    <script>
+        function toggleTask(taskId, isChecked) {
+            const item = document.getElementById(`task-${taskId}`);
+
+            fetch(`/toggle_task/${taskId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ completed: isChecked })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        if (isChecked) {
+                            item.classList.add('completed');
+                        } else {
+                            item.classList.remove('completed');
+                        }
+                    } else {
+                        alert('Error updating task: ' + data.error);
+                        // Revert checkbox
+                        document.querySelector(`#task-${taskId} .task-checkbox`).checked = !isChecked;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Connection error');
+                    document.querySelector(`#task-${taskId} .task-checkbox`).checked = !isChecked;
+                });
+        }
+    </script>
+</body>
+
+</html>

@@ -40,6 +40,7 @@ create table if not exists public.tasks (
   id uuid default uuid_generate_v4() primary key,
   subject_id uuid references public.subjects on delete cascade not null,
   description text not null,
+  reference text,
   is_completed boolean default false,
   due_date date,
   created_at timestamp with time zone default timezone('utc'::text, now())
