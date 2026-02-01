@@ -149,11 +149,19 @@
                             '').replace('[Hard]', '').strip() }}</div>
                         {% if task.reference %}
                         <div class="task-ref" style="font-size: 0.8rem; margin-top: 0.3rem;">
-                            <span style="color: #666;">Source:</span>
-                            <a href="#"
-                                onclick="alert('In a real app, this would open: {{ task.reference }}'); return false;"
-                                style="color: var(--primary-color); text-decoration: underline;">{{ task.reference
-                                }}</a>
+                            <span style="color: #666;">Resource:</span>
+                            {% set ref_parts = task.reference.split('|') %}
+                            {% if ref_parts|length == 2 %}
+                            <a href="{{ ref_parts[1] }}" target="_blank"
+                                style="color: var(--primary-color); text-decoration: underline; font-weight: 500;">
+                                {{ ref_parts[0] }} ↗
+                            </a>
+                            {% else %}
+                            <a href="https://www.google.com/search?q={{ task.description }}+free+course" target="_blank"
+                                style="color: var(--primary-color); text-decoration: underline;">
+                                {{ task.reference }} ↗
+                            </a>
+                            {% endif %}
                         </div>
                         {% endif %}
                     </div>

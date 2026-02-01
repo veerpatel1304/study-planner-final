@@ -128,13 +128,38 @@
                     Subject</button>
 
                 <div style="margin-top: 2rem; border-top: 1px solid #eee; padding-top: 1rem;">
-                    <button type="submit" class="btn btn-primary btn-full">Create Plan</button>
+                    <button type="submit" id="submit-btn" class="btn btn-primary btn-full">Create Plan</button>
+                    <div id="loading-msg"
+                        style="display: none; text-align: center; margin-top: 1rem; color: var(--primary-color);">
+                        <div class="spinner"
+                            style="display: inline-block; width: 20px; height: 20px; border: 3px solid rgba(0,0,0,.1); border-top-color: var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite;">
+                        </div>
+                        <span style="margin-left: 10px;">AI is parsing your syllabus and building your
+                            schedule...</span>
+                    </div>
                     <a href="{{ url_for('dashboard') }}" class="btn btn-full"
                         style="text-align:center; display:block; margin-top:0.5rem; background:#eee; color:#333;">Cancel</a>
                 </div>
             </form>
         </div>
     </main>
+
+    <style>
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+
+    <script>
+        document.querySelector('form').addEventListener('submit', function (e) {
+            const btn = document.getElementById('submit-btn');
+            const msg = document.getElementById('loading-msg');
+            btn.style.display = 'none';
+            msg.style.display = 'block';
+        });
+    </script>
 </body>
 
 </html>

@@ -284,7 +284,8 @@ def create_plan():
                     subjects_info_for_ai.append({
                         'name': sub_name,
                         'topics': t['name'],
-                        'difficulty': t['difficulty']
+                        'difficulty': t['difficulty'],
+                        'reference': t.get('reference')
                     })
                 
                 # 2. Add Manual topics if any
@@ -317,7 +318,7 @@ def create_plan():
                         tasks_data.append({
                             "subject_id": s_id,
                             "description": item['description'],
-                            "reference": item.get('reference'),
+                            "reference": f"{item['reference_text']}|{item['reference_url']}",
                             "due_date": item['date'],
                             "is_completed": False
                         })
@@ -335,6 +336,8 @@ def create_plan():
             return redirect(url_for('dashboard'))
             
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             print(f"Error creating plan: {e}")
             flash(f"Error creating plan: {str(e)}", "error")
             return redirect(url_for('create_plan'))
