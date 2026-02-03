@@ -43,3 +43,5 @@ This repository is configured for easy deployment on Vercel.
    python app.py
    ```
 
+## 📄 License
+MIT License

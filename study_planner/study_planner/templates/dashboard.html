@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Study Planner - Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+    <header>
+        <nav>
+            <div class="logo">Study Planner</div>
+            <div class="nav-links">
+                <span>Welcome, {{ user if user else 'Student' }}!</span>
+                <a href="{{ url_for('profile') }}" class="btn">My Profile</a>
+                <a href="{{ url_for('logout') }}" class="btn">Logout</a>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container">
+        <h1>My Dashboard</h1>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="flash-messages">
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        {% if not db_healthy %}
+        <div class="alert alert-warning" style="margin-bottom: 2rem; border-left: 5px solid #f39c12;">
+            <h4 style="margin-top: 0;">⚠️ Database Setup Required</h4>
+            <p>The AI Agent cannot save your study plans because the <code>tasks</code> table is missing in your
+                Supabase project.</p>
+            <p style="margin-top: 0.5rem;">To fix this, please run the SQL code from <code>schema.sql</code> in your
+                <strong>Supabase SQL Editor</strong>.
+            </p>
+        </div>
+        {% endif %}
+
+        <div class="dashboard-content">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h3>My Study Plans</h3>
+                    <a href="{{ url_for('create_plan') }}" class="btn btn-small btn-primary">+ New Plan</a>
+                </div>
+
+                {% if plans %}
+                <ul class="plan-list">
+                    {% for plan in plans %}
+                    <li style="border-bottom: 1px solid #eee; padding: 1rem 0;">
+                        <strong>{{ plan.title }}</strong>
+                        <p style="color: #666; font-size: 0.9rem; margin: 0.2rem 0;">{{ plan.goal }}</p>
+                        <small>From {{ plan.start_date }} to {{ plan.end_date }}</small>
+                        <div style="margin-top: 0.5rem;">
+                            <!-- Placeholder for View/Edit links -->
+                            <a href="{{ url_for('view_plan', plan_id=plan.id) }}"
+                                style="color: var(--primary-color); font-size: 0.9rem;">View Details</a>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p>You have no active study plans yet.</p>
+                <div style="margin-top: 1rem;">
+                    <a href="{{ url_for('create_plan') }}" class="btn btn-small">Create Your First Plan</a>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="card">
+                <h3>Today's Learning Targets</h3>
+                {% if today_tasks %}
+                <ul class="task-list" style="list-style: none; padding: 0;">
+                    {% for task in today_tasks %}
+                    <li id="task-{{ task.id }}" class="task-item {% if task.is_completed %}completed{% endif %}"
+                        style="display: flex; align-items: center; padding: 1rem; border-bottom: 1px solid #eee; background: {{ '#f8fafc' if task.is_completed else 'white' }}; border-radius: 8px; margin-bottom: 0.5rem; transition: all 0.2s ease;">
+                        <input type="checkbox" class="task-checkbox" {% if task.is_completed %}checked{% endif %}
+                            onchange="toggleTask('{{ task.id }}', this.checked)"
+                            style="margin-right: 1rem; width: 1.25rem; height: 1.25rem; cursor: pointer; accent-color: var(--primary-color);">
+                        <div style="flex-grow: 1;">
+                            <div class="task-desc"
+                                style="font-weight: 500; font-size: 0.95rem; color: #1e293b; {{ 'text-decoration: line-through; color: #94a3b8;' if task.is_completed }}">
+                                {{ task.description.replace('[Easy]', '').replace('[Medium]', '').replace('[Hard]',
+                                '').strip() }}
+                            </div>
+                            <div
+                                style="font-size: 0.75rem; color: #64748b; margin-top: 2px; display: flex; align-items: center; gap: 0.5rem;">
+                                <span
+                                    style="background: #eff6ff; color: #3b82f6; padding: 1px 6px; border-radius: 4px; font-weight: 600; text-transform: uppercase;">{{
+                                    task.subject_name }}</span>
+                                {% if 'Easy' in task.description %}
+                                <span class="badge"
+                                    style="background: #f0fdf4; color: #15803d; border: none; font-size: 0.65rem;">EASY</span>
+                                {% elif 'Medium' in task.description %}
+                                <span class="badge"
+                                    style="background: #fffbeb; color: #b45309; border: none; font-size: 0.65rem;">MEDIUM</span>
+                                {% else %}
+                                <span class="badge"
+                                    style="background: #fef2f2; color: #b91c1c; border: none; font-size: 0.65rem;">HARD</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div style="text-align: center; padding: 2rem 1rem;">
+                    <div style="font-size: 2rem; margin-bottom: 1rem;">🎯</div>
+                    <p style="color: #64748b; font-size: 0.95rem;">No tasks scheduled for today.</p>
+                    <p style="color: #94a3b8; font-size: 0.85rem; margin-top: 0.5rem;">Take a break or check your full
+                        schedule in "View Details".</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <script>
+            function toggleTask(taskId, isChecked) {
+                const item = document.getElementById(`task-${taskId}`);
+
+                fetch(`/toggle_task/${taskId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ completed: isChecked })
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            if (isChecked) {
+                                item.classList.add('completed');
+                                item.style.background = '#f8fafc'; // Keep for visual immediate feedback if needed, but class should handle it
+                            } else {
+                                item.classList.remove('completed');
+                                item.style.background = 'white';
+                            }
+                        } else {
+                            alert('Error updating task: ' + data.error);
+                            document.querySelector(`#task-${taskId} .task-checkbox`).checked = !isChecked;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('Connection error');
+                        document.querySelector(`#task-${taskId} .task-checkbox`).checked = !isChecked;
+                    });
+            }
+        </script>
+
+        <div class="ml-notice">
+            <p><em>Coming Soon: AI-driven study recommendations based on your learning pace!</em></p>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 Study Planner. All rights reserved.</p>
+    </footer>
+</body>
+
+</html>
